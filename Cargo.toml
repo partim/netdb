@@ -1,0 +1,16 @@
+[package]
+name = "nsswitch"
+version = "0.1.0"
+authors = ["Martin Hoffmann <hn@nvnc.de>"]
+description = "Name Service Switch for Rust."
+documentation = "https://docs.rs/nsswitch/"
+homepage = "https://github.com/partim/nsswitch"
+repository = "https://github.com/partim/nsswitch"
+readme = "README.md"
+keywords = []
+license = "MIT"
+
+[depencendies]
+domain     = "0.2.0"
+futures    = "0.1.11"
+tokio-core = "0.1.6"
