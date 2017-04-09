@@ -1,18 +1,32 @@
 //! The files source for the hosts database.
 
-
+use std::{convert, error, fmt, fs, io, net, slice, result};
 use std::collections::HashMap;
-use std::convert;
-use std::error;
-use std::fmt;
-use std::fs;
-use std::io;
-use std::net::{self, IpAddr};
+use std::net::IpAddr;
 use std::path::Path;
-use std::slice;
 use std::str::FromStr;
-use std::result;
 use domain::bits::name::{self, DNameSlice, DNameBuf};
+use super::HostEnt;
+
+
+pub fn get_host_by_name<N: AsRef<DNameSlice>>(name: N)
+                                              -> io::Result<Option<HostEnt>> {
+    let hosts = Hosts::default();
+    match hosts.lookup_host(name.as_ref()) {
+        Some(iter) => {
+            Ok(Some(HostEnt {
+                name: format!("{}", name.as_ref()),
+                aliases: Vec::new(),
+                addrs: iter.map(|addr| *addr).collect(),
+            }))
+        }
+        None => Ok(None)
+    }
+}
+
+pub fn get_host_by_addr(addr: IpAddr) -> io::Result<Option<HostEnt>> {
+    unimplemented!()
+}
 
 
 //------------ Hosts --------------------------------------------------------

@@ -2,26 +2,25 @@ use std::{io, mem};
 use std::net::IpAddr;
 use std::str::FromStr;
 use domain::bits::DNameBuf;
-use domain::resolv::Resolver;
-use domain::resolv::lookup::host::{lookup_host, FoundHosts, LookupHost};
 use futures::{Async, Future, Poll};
 use tokio_core::reactor;
 
 
 //============ Low-level API =================================================
 
+pub mod dns;
 pub mod files;
 
 
 //============ High-level API ================================================
 
-pub fn get_host_by_name(name: &str) -> Result<HostEnt, io::Error> {
+pub fn get_host_by_name(name: &str) -> Result<Option<HostEnt>, io::Error> {
     let mut core = reactor::Core::new()?;
     let handle = core.handle();
     core.run(poll_host_by_name(name, &handle))
 }
 
-pub fn get_host_by_addr(addr: IpAddr) -> Result<HostEnt, io::Error> {
+pub fn get_host_by_addr(addr: IpAddr) -> Result<Option<HostEnt>, io::Error> {
     let mut core = reactor::Core::new()?;
     let handle = core.handle();
     core.run(poll_host_by_addr(addr, &handle))
@@ -47,12 +46,12 @@ pub fn get_host_by_addr(addr: IpAddr) -> Result<HostEnt, io::Error> {
 /// records. This initial version also does not yet fill the aliases list of
 /// the returned `HostEnt`.
 pub fn poll_host_by_name(name: &str, reactor: &reactor::Handle)
-                         -> HostByNameFuture {
-    HostByNameFuture::new(name, reactor)
+                         -> HostByName {
+    HostByName::new(name, reactor)
 }
 
 pub fn poll_host_by_addr(addr: IpAddr, reactor: &reactor::Handle)
-                         -> HostByAddrFuture {
+                         -> HostByAddr {
     unimplemented!()
 }
 
@@ -65,75 +64,62 @@ pub struct HostEnt {
     pub addrs: Vec<IpAddr>,
 }
 
-impl From<FoundHosts> for HostEnt {
-    fn from(found: FoundHosts) -> HostEnt {
-        HostEnt {
-            name: format!("{}", found.canonical_name()),
-            aliases: Vec::new(),
-            addrs: found.iter().collect(),
-        }
-    }
-}
 
-//------------ HostByNameFuture ----------------------------------------------
+//------------ HostByName ----------------------------------------------------
 
-pub struct HostByNameFuture(ByNameInner);
+pub struct HostByName(ByNameInner);
 
 enum ByNameInner {
-    Dns(LookupHost),
+    Files(HostEnt),
+    Dns(dns::HostByName),
     Error(io::Error),
     Done,
 }
 
-impl HostByNameFuture {
+impl HostByName {
     pub fn new(name: &str, reactor: &reactor::Handle) -> Self {
         let name = match DNameBuf::from_str(name) {
             Ok(name) => name,
             Err(e) => {
-                return HostByNameFuture(ByNameInner::Error(
+                return HostByName(ByNameInner::Error(
                     io::Error::new(io::ErrorKind::Other, e)
                 ))
             }
         };
-        HostByNameFuture(ByNameInner::Dns(lookup_host(Resolver::new(reactor),
-                                                      name)))
+        HostByName(match files::get_host_by_name(&name) {
+            Ok(Some(ent)) => ByNameInner::Files(ent),
+            Ok(None) => ByNameInner::Dns(dns::HostByName::new(name, reactor)),
+            Err(err) => ByNameInner::Error(err),
+        })
     }
 }
 
 
-impl Future for HostByNameFuture {
-    type Item = HostEnt;
+impl Future for HostByName {
+    type Item = Option<HostEnt>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         match self.0 {
-            ByNameInner::Dns(ref mut lookup) => {
-                let found = match lookup.poll() {
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Ok(Async::Ready(found)) => found,
-                    Err(err) => {
-                        return Err(io::Error::new(io::ErrorKind::Other, err))
-                    }
-                };
-                return Ok(Async::Ready(found.into()))
-            }
+            ByNameInner::Dns(ref mut lookup) => return lookup.poll(),
             _ => { }
         }
         match mem::replace(&mut self.0, ByNameInner::Done) {
+            ByNameInner::Files(res) => Ok(Async::Ready(Some(res))),
             ByNameInner::Error(err) => Err(err),
-            ByNameInner::Done => panic!("polling a resolved HostByNameFuture"),
+            ByNameInner::Done => panic!("polling a resolved HostByName"),
             _ => panic!()
         }
     }
 }
 
 
-//------------ HostByAddrFuture ----------------------------------------------
+//------------ HostByAddr ----------------------------------------------------
 
-pub struct HostByAddrFuture;
+pub struct HostByAddr;
 
-impl Future for HostByAddrFuture {
-    type Item = HostEnt;
+impl Future for HostByAddr {
+    type Item = Option<HostEnt>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
