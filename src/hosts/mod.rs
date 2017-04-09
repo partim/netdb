@@ -78,6 +78,13 @@ enum ByNameInner {
 
 impl HostByName {
     pub fn new(name: &str, reactor: &reactor::Handle) -> Self {
+        if let Ok(addr) = IpAddr::from_str(name) {
+            return HostByName(ByNameInner::Files(HostEnt {
+                name: name.into(),
+                aliases: Vec::new(),
+                addrs: vec!(addr),
+            }))
+        }
         let name = match DNameBuf::from_str(name) {
             Ok(name) => name,
             Err(e) => {
