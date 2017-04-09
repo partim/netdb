@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = []
 license = "MIT"
 
-[depencendies]
+[dependencies]
 domain     = "0.2.0"
 futures    = "0.1.11"
 tokio-core = "0.1.6"
