@@ -59,9 +59,34 @@ pub fn poll_host_by_addr(addr: IpAddr, reactor: &reactor::Handle)
 //------------ HostEnt -------------------------------------------------------
 
 pub struct HostEnt {
-    pub name: String,
-    pub aliases: Vec<String>,
-    pub addrs: Vec<IpAddr>,
+    name: String,
+    aliases: Vec<String>,
+    addrs: Vec<IpAddr>,
+}
+
+impl HostEnt {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn aliases(&self) -> AliasesIter {
+        AliasesIter(self.aliases.iter())
+    }
+
+    pub fn addrs(&self) -> ::std::slice::Iter<IpAddr> {
+        self.addrs.iter()
+    }
+}
+
+
+pub struct AliasesIter<'a>(::std::slice::Iter<'a, String>);
+
+impl<'a> Iterator for AliasesIter<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|s| s.as_ref())
+    }
 }
 
 
