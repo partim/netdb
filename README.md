@@ -28,8 +28,8 @@ extern crate netdb
 
 The crate will contain the following databases:
 
-[ ] hosts
-[ ] networks
-[ ] protocols
-[ ] services
+- [ ] hosts
+- [ ] networks
+- [ ] protocols
+- [ ] services
 
