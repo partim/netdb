@@ -1,11 +1,11 @@
 [package]
-name = "nsswitch"
+name = "netdb"
 version = "0.1.0"
 authors = ["Martin Hoffmann <hn@nvnc.de>"]
-description = "Name Service Switch for Rust."
-documentation = "https://docs.rs/nsswitch/"
-homepage = "https://github.com/partim/nsswitch"
-repository = "https://github.com/partim/nsswitch"
+description = "Access to network-related name databases"
+documentation = "https://docs.rs/netdb/"
+homepage = "https://github.com/partim/netdb"
+repository = "https://github.com/partim/netdb"
 readme = "README.md"
 keywords = []
 license = "MIT"

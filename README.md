@@ -1,9 +1,9 @@
-# nsswitch: Name Service Switch for Rust
+# netdb: Network Database for Rust
 
-This crate will eventually contain a pure-Rust implementation of the
-name service switch facilities provided by many Unix-style systems on all
-platforms supported by Rust. It will allow looking up various types of
-network-related names according to the system configuration.
+This crate will eventually contain a pure-Rust implementation of queries
+for network-related names similar to the functions found in POSIX’
+`netdb.h`. The eventual implementation will be cross-platform and perform
+the correct actions as configured for the particular system.
 
 For the moment, the crate is too young to be on crates.io.
 
@@ -14,12 +14,22 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nsswitch = "0.1.0"
+netdb = "0.1.0"
 ```
 
 Then, add this to your crate root:
 
 ```rust
-extern crate nsswith
+extern crate netdb
 ```
+
+
+## Databases
+
+The crate will contain the following databases:
+
+[ ] hosts
+[ ] networks
+[ ] protocols
+[ ] services
 
