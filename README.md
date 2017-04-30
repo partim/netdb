@@ -26,10 +26,16 @@ extern crate netdb
 
 ## Databases
 
-The crate will contain the following databases:
+The crate will contain the following databases, each available in a module
+of the same name:
 
 - [ ] hosts
 - [ ] networks
 - [ ] protocols
 - [ ] services
+
+In addition, the following modules will provide functions combining
+information from several databases:
+
+- [ ] addr
 

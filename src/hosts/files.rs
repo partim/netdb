@@ -25,7 +25,21 @@ pub fn get_host_by_name<N: AsRef<DNameSlice>>(name: N)
 }
 
 pub fn get_host_by_addr(addr: IpAddr) -> io::Result<Option<HostEnt>> {
-    unimplemented!()
+    let hosts = Hosts::default();
+    match hosts.lookup_addr(addr) {
+        Some(mut iter) => {
+            let name = match iter.next() {
+                None => return Ok(None),
+                Some(name) => format!("{}", name)
+            };
+            Ok(Some(HostEnt {
+                name: name,
+                aliases: iter.map(|n| format!("{}", n)).collect(),
+                addrs: vec![addr],
+            }))
+        }
+        None => Ok(None)
+    }
 }
 
 

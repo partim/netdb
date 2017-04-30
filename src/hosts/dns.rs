@@ -5,7 +5,8 @@ use std::net::IpAddr;
 use domain::bits::DNameSlice;
 use domain::resolv::Resolver;
 use domain::resolv::error::Error;
-use domain::resolv::lookup::host::{lookup_host, FoundHosts, LookupHost};
+use domain::resolv::lookup::host::{LookupHost, lookup_host};
+use domain::resolv::lookup::addr::{LookupAddr, lookup_addr};
 use futures::{Async, Future, Poll};
 use tokio_core::reactor;
 use super::HostEnt;
@@ -30,9 +31,14 @@ impl Future for HostByName {
         match self.0 {
             Ok(ref mut lookup) => {
                 match lookup.poll() {
+                    Ok(Async::Ready(found)) => {
+                        Ok(Async::Ready(Some(HostEnt {
+                            name: format!("{}", found.canonical_name()),
+                            aliases: Vec::new(),
+                            addrs: found.iter().collect(),
+                        })))
+                    }
                     Ok(Async::NotReady) => Ok(Async::NotReady),
-                    Ok(Async::Ready(found))
-                        => Ok(Async::Ready(Some(found.into()))),
                     Err(Error::Question(err))
                         => panic!("Question error: {}", err),
                     Err(Error::Io(err)) => Err(err),
@@ -42,7 +48,7 @@ impl Future for HostByName {
             Err(ref mut inner) => {
                 match mem::replace(inner, None) {
                     Some(err) => Err(err),
-                    None => panic!("polling a resolved HostByname"),
+                    None => panic!("polling a resolved HostByName"),
                 }
             }
         }
@@ -52,11 +58,17 @@ impl Future for HostByName {
 
 //------------ HostByAddr ----------------------------------------------------
 
-pub struct HostByAddr;
+pub struct HostByAddr {
+    addr: IpAddr,
+    result: Result<LookupAddr, Option<io::Error>>,
+}
 
 impl HostByAddr {
     pub fn new(addr: IpAddr, reactor: &reactor::Handle) -> Self {
-        unimplemented!()
+        HostByAddr {
+            addr: addr,
+            result: Ok(lookup_addr(Resolver::new(reactor), addr))
+        }
     }
 }
 
@@ -65,20 +77,36 @@ impl Future for HostByAddr {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        unimplemented!()
-    }
-}
-
-
-//------------ Extension for HostEnt -----------------------------------------
-
-impl From<FoundHosts> for HostEnt {
-    fn from(found: FoundHosts) -> HostEnt {
-        HostEnt {
-            name: format!("{}", found.canonical_name()),
-            aliases: Vec::new(),
-            addrs: found.iter().collect(),
+        match self.result {
+            Ok(ref mut lookup) => {
+                match lookup.poll() {
+                    Ok(Async::Ready(found)) => {
+                        let mut iter = found.iter();
+                        let name = match iter.next() {
+                            None => return Ok(Async::Ready(None)),
+                            Some(name) => format!("{}", name)
+                        };
+                        Ok(Async::Ready(Some(HostEnt {
+                            name: name,
+                            aliases: iter.map(|n| format!("{}", n)).collect(),
+                            addrs: vec![self.addr],
+                        })))
+                    }
+                    Ok(Async::NotReady) => Ok(Async::NotReady),
+                    Err(Error::Question(err))
+                        => panic!("Question error: {}", err),
+                    Err(Error::Io(err)) => Err(err),
+                    _ => Ok(Async::Ready(None)),
+                }
+            }
+            Err(ref mut inner) => {
+                match mem::replace(inner, None) {
+                    Some(err) => Err(err),
+                    None => panic!("polling a resolved HostByAddr")
+                }
+            }
         }
     }
 }
+
 

@@ -52,7 +52,7 @@ pub fn poll_host_by_name(name: &str, reactor: &reactor::Handle)
 
 pub fn poll_host_by_addr(addr: IpAddr, reactor: &reactor::Handle)
                          -> HostByAddr {
-    unimplemented!()
+    HostByAddr::new(addr, reactor)
 }
 
 
@@ -132,9 +132,8 @@ impl Future for HostByName {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        match self.0 {
-            ByNameInner::Dns(ref mut lookup) => return lookup.poll(),
-            _ => { }
+        if let ByNameInner::Dns(ref mut lookup) = self.0 {
+            return lookup.poll();
         }
         match mem::replace(&mut self.0, ByNameInner::Done) {
             ByNameInner::Files(res) => Ok(Async::Ready(Some(res))),
@@ -148,14 +147,39 @@ impl Future for HostByName {
 
 //------------ HostByAddr ----------------------------------------------------
 
-pub struct HostByAddr;
+pub struct HostByAddr(ByAddrInner);
+
+enum ByAddrInner {
+    Files(HostEnt),
+    Dns(dns::HostByAddr),
+    Error(io::Error),
+    Done
+}
+
+impl HostByAddr {
+    pub fn new(addr: IpAddr, reactor: &reactor::Handle) -> Self {
+        HostByAddr(match files::get_host_by_addr(addr) {
+            Ok(Some(ent)) => ByAddrInner::Files(ent),
+            Ok(None) => ByAddrInner::Dns(dns::HostByAddr::new(addr, reactor)),
+            Err(err) => ByAddrInner::Error(err),
+        })
+    }
+}
 
 impl Future for HostByAddr {
     type Item = Option<HostEnt>;
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        unimplemented!()
+        if let ByAddrInner::Dns(ref mut lookup) = self.0 {
+            return lookup.poll();
+        }
+        match mem::replace(&mut self.0, ByAddrInner::Done) {
+            ByAddrInner::Files(res) => Ok(Async::Ready(Some(res))),
+            ByAddrInner::Error(err) => Err(err),
+            ByAddrInner::Done => panic!("polling a resolved HostByAddr"),
+            _ => panic!()
+        }
     }
 }
 
