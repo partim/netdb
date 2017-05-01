@@ -69,23 +69,12 @@ impl HostEnt {
         &self.name
     }
 
-    pub fn aliases(&self) -> AliasesIter {
-        AliasesIter(self.aliases.iter())
+    pub fn aliases(&self) -> &[String] {
+        self.aliases.as_ref()
     }
 
     pub fn addrs(&self) -> ::std::slice::Iter<IpAddr> {
         self.addrs.iter()
-    }
-}
-
-
-pub struct AliasesIter<'a>(::std::slice::Iter<'a, String>);
-
-impl<'a> Iterator for AliasesIter<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|s| s.as_ref())
     }
 }
 
