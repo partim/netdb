@@ -1,3 +1,9 @@
+/// The host name and IP address database.
+///
+/// This database provides queries for host names and IP addresses associated
+/// with network hosts. It allows lookups based on a given host name or a
+/// given IP address.
+
 use std::{io, mem};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -7,19 +13,54 @@ use tokio_core::reactor;
 
 
 //============ Low-level API =================================================
+//
+// Currently private.
 
-pub mod dns;
-pub mod files;
+mod dns;
+mod files;
 
 
 //============ High-level API ================================================
 
+/// Returns host information for a given host name.
+///
+/// The name is either a hostname, an IPv4 or IPv6 address in its standard
+/// text notation. In the latter two cases, no lookups are performed and a
+/// `HostEnt` is returned with `name` as the canonical name, the parsed
+/// address as the sole address, and no aliases.
+///
+/// Otherwise the name is interpreted as a host name and lookups according to
+/// the system configuraition are performed.
+///
+/// The function waits for all necessary IO to resolve. Upon success, it
+/// returns a `HostEnt` value if a host for the given name was found or
+/// `Ok(None)` otherwise.
+///
+/// # Limitations
+///
+/// For this initial version of the crate, the lookup is a `files` lookup
+/// first and only if that does fail to yield a result, a DNS query for
+/// both A and AAAA records. This initial version also does not yet fill
+/// the aliases list of the returned `HostEnt`.
 pub fn get_host_by_name(name: &str) -> Result<Option<HostEnt>, io::Error> {
     let mut core = reactor::Core::new()?;
     let handle = core.handle();
     core.run(poll_host_by_name(name, &handle))
 }
 
+/// Returns host information for a given IP address.
+///
+/// The IP address can either be an IPv4 or IPv6 address. The function waits
+/// for all necessary IO to resolve. Upon success, it
+/// returns a `HostEnt` value if a host for the given name was found or
+/// `Ok(None)` otherwise.
+///
+/// # Limitations
+///
+/// For this initial version of the crate, the lookup is a `files` lookup
+/// first and only if that does fail to yield a result, a DNS query for
+/// PTR records. This initial version also does not yet fill
+/// the aliases list of the returned `HostEnt`.
 pub fn get_host_by_addr(addr: IpAddr) -> Result<Option<HostEnt>, io::Error> {
     let mut core = reactor::Core::new()?;
     let handle = core.handle();
@@ -37,19 +78,31 @@ pub fn get_host_by_addr(addr: IpAddr) -> Result<Option<HostEnt>, io::Error> {
 /// the system configuraition are performed.
 ///
 /// The function returns a future that performes all necessary IO via the
-/// tokio reactor given by `reactor`.
+/// Tokio reactor given by `reactor`.
 ///
 /// # Limitations
 ///
 /// For this initial version of the crate, the lookup is a `files` lookup
-/// first and only if that does not succeed, a DNS query for both A and AAAA
-/// records. This initial version also does not yet fill the aliases list of
-/// the returned `HostEnt`.
+/// first and only if that does fail to yield a result, a DNS query for
+/// both A and AAAA records. This initial version also does not yet fill
+/// the aliases list of the returned `HostEnt`.
 pub fn poll_host_by_name(name: &str, reactor: &reactor::Handle)
                          -> HostByName {
     HostByName::new(name, reactor)
 }
 
+/// Returns host information for a given IP address.
+///
+/// The IP address can either be an IPv4 or IPv6 address. The function returns
+/// a future performing all necessary IO via the Tokio reactor given by
+/// `reactor`.
+///
+/// # Limitations
+///
+/// For this initial version of the crate, the lookup is a `files` lookup
+/// first and only if that does fail to yield a result, a DNS query for
+/// PTR records. This initial version also does not yet fill
+/// the aliases list of the returned `HostEnt`.
 pub fn poll_host_by_addr(addr: IpAddr, reactor: &reactor::Handle)
                          -> HostByAddr {
     HostByAddr::new(addr, reactor)
@@ -58,6 +111,10 @@ pub fn poll_host_by_addr(addr: IpAddr, reactor: &reactor::Handle)
 
 //------------ HostEnt -------------------------------------------------------
 
+/// The result of a host lookup.
+///
+/// > **Note.** This implementation is highly temporary. While will probably
+/// > keep the semantics, the actual types may change. 
 pub struct HostEnt {
     name: String,
     aliases: Vec<String>,
@@ -65,22 +122,31 @@ pub struct HostEnt {
 }
 
 impl HostEnt {
+    /// The canoncial name of the host.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// The aliases of the host.
+    ///
+    /// > **Note.** Best to assume this is a slice of `str`.
     pub fn aliases(&self) -> &[String] {
         self.aliases.as_ref()
     }
 
-    pub fn addrs(&self) -> ::std::slice::Iter<IpAddr> {
-        self.addrs.iter()
+    /// The addresses of the host.
+    pub fn addrs(&self) -> &[IpAddr] {
+        self.addrs.as_ref()
     }
 }
 
 
 //------------ HostByName ----------------------------------------------------
 
+/// The future returned by `poll_host_by_name()`.
+///
+/// Resolves into a `HostEnt` value if the lookup is successful or `None` if
+/// there is no such name.
 pub struct HostByName(ByNameInner);
 
 enum ByNameInner {
@@ -136,6 +202,10 @@ impl Future for HostByName {
 
 //------------ HostByAddr ----------------------------------------------------
 
+/// The future returned by `poll_host_by_addr()`.
+///
+/// Resolves into a `HostEnt` value if the lookup is successful or `None` if
+/// there is no such address.
 pub struct HostByAddr(ByAddrInner);
 
 enum ByAddrInner {

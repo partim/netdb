@@ -5,8 +5,6 @@ for network-related names similar to the functions found in POSIX’
 `netdb.h`. The eventual implementation will be cross-platform and perform
 the correct actions as configured for the particular system.
 
-For the moment, the crate is too young to be on crates.io.
-
 
 ## Usage
 
