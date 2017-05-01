@@ -7,7 +7,7 @@ documentation = "https://docs.rs/netdb/"
 homepage = "https://github.com/partim/netdb"
 repository = "https://github.com/partim/netdb"
 readme = "README.md"
-keywords = []
+keywords = ["dns", "hostname", "futures", "tokio"]
 license = "MIT"
 
 [dependencies]
